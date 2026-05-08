@@ -111,7 +111,7 @@ const App: React.FC = () => {
         />
       </label>
 
-      <p className="note">一覧ページの一括追加はICSファイルで出力します。個別ページのGoogleカレンダー登録画面では通知推奨を詳細欄に入れます。</p>
+      <p className="note">一覧ページの一括追加は、未追加の締切ごとにGoogleカレンダー登録画面を別タブで開きます。</p>
 
       <div className="actions">
         <button type="button" className="primary" onClick={saveSettings}>保存</button>

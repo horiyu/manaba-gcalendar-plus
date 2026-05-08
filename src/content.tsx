@@ -265,93 +265,22 @@ const openCalendarUrl = (url: string): void => {
   window.open(url, '_blank', 'noopener,noreferrer');
 };
 
-const formatIcsUtcDate = (date: Date): string => date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-
-const getIcsTimezone = (settings: Settings): string => settings.timezone.replace(/[^a-zA-Z0-9/_+-]/g, '') || 'UTC';
-
-const escapeIcsText = (text: string): string => {
-  return text
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g, '\\;')
-    .replace(/,/g, '\\,')
-    .replace(/\r?\n/g, '\\n');
-};
-
-const foldIcsLine = (line: string): string => {
-  const limit = 72;
-  const parts: string[] = [];
-  let rest = line;
-
-  while (rest.length > limit) {
-    parts.push(rest.slice(0, limit));
-    rest = rest.slice(limit);
+const openCalendarTabs = async (urls: string[]): Promise<number> => {
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type: 'MGCP_OPEN_CALENDAR_TABS', urls }, (response) => {
+        const error = chrome.runtime.lastError;
+        if (error) {
+          reject(new Error(error.message));
+          return;
+        }
+        resolve(typeof response?.opened === 'number' ? response.opened : urls.length);
+      });
+    });
   }
-  parts.push(rest);
 
-  return parts.map((part, index) => index === 0 ? part : ` ${part}`).join('\r\n');
-};
-
-const createIcsFileContent = (assignments: Assignment[], settings: Settings): string => {
-  const now = formatIcsUtcDate(new Date());
-  const timezone = getIcsTimezone(settings);
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//manaba Google Calendar Plus//JP',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-  ];
-
-  assignments.forEach((assignment) => {
-    const start = new Date(assignment.deadline.getTime() - settings.eventDurationMinutes * 60 * 1000);
-    const description = [
-      `コース: ${assignment.course}`,
-      `種別: ${assignment.type}`,
-      `提出締切: ${assignment.deadlineText}`,
-      assignment.url,
-    ].filter(Boolean).join('\n');
-
-    lines.push(
-      'BEGIN:VEVENT',
-      `UID:${assignment.id}@manaba-gcalendar-plus`,
-      `DTSTAMP:${now}`,
-      `DTSTART;TZID=${timezone}:${formatGoogleDate(start)}`,
-      `DTEND;TZID=${timezone}:${formatGoogleDate(assignment.deadline)}`,
-      `SUMMARY:${escapeIcsText(`[manaba締切] ${assignment.title}`)}`,
-      `DESCRIPTION:${escapeIcsText(description)}`,
-      `URL:${escapeIcsText(assignment.url)}`,
-      'LOCATION:manaba',
-    );
-
-    if (settings.reminderMinutes > 0) {
-      lines.push(
-        'BEGIN:VALARM',
-        `TRIGGER:-PT${settings.reminderMinutes}M`,
-        'ACTION:DISPLAY',
-        `DESCRIPTION:${escapeIcsText(`[manaba締切] ${assignment.title}`)}`,
-        'END:VALARM',
-      );
-    }
-
-    lines.push('END:VEVENT');
-  });
-
-  lines.push('END:VCALENDAR');
-  return `${lines.map(foldIcsLine).join('\r\n')}\r\n`;
-};
-
-const downloadIcsFile = (assignments: Assignment[], settings: Settings): void => {
-  const blob = new Blob([createIcsFileContent(assignments, settings)], {
-    type: 'text/calendar;charset=utf-8',
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `manaba-deadlines-${new Date().toISOString().slice(0, 10)}.ics`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  urls.forEach((url) => openCalendarUrl(url));
+  return urls.length;
 };
 
 const createButton = (label: string, onClick: () => void | Promise<void>, secondary = false): HTMLButtonElement => {
@@ -480,16 +409,16 @@ const insertBulkButton = async (settings: Settings): Promise<void> => {
   status.className = 'mgcp-status';
   status.textContent = `締切あり ${assignments.length} 件 / 未追加 ${pending.length} 件`;
 
-  const button = createButton(`未追加の締切をICSで出力 (${pending.length})`, async () => {
+  const button = createButton(`未追加の締切をまとめて開く (${pending.length})`, async () => {
     if (pending.length === 0) {
       return;
     }
 
     button.disabled = true;
-    downloadIcsFile(pending, settings);
+    const openedCount = await openCalendarTabs(pending.map((assignment) => createCalendarUrl(assignment, settings)));
     await markAdded(pending.map((assignment) => assignment.id));
-    setButtonDone(button, 'ICSを出力しました');
-    status.textContent = `${pending.length} 件の予定をICSファイルに出力しました`;
+    setButtonDone(button, '登録画面を開きました');
+    status.textContent = `${openedCount} 件のGoogleカレンダー登録画面を開きました`;
   });
 
   if (pending.length === 0) {
