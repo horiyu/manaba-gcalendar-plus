@@ -111,7 +111,7 @@ const App: React.FC = () => {
         />
       </label>
 
-      <p className="note">GoogleカレンダーのURL作成では通知を直接指定できないため、予定の詳細欄に通知推奨を入れます。</p>
+      <p className="note">一覧ページの一括追加はICSファイルで出力します。個別ページのGoogleカレンダー登録画面では通知推奨を詳細欄に入れます。</p>
 
       <div className="actions">
         <button type="button" className="primary" onClick={saveSettings}>保存</button>
