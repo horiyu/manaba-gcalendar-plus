@@ -25,6 +25,7 @@ const BUTTON_CLASS = 'mgcp-button';
 const SECONDARY_BUTTON_CLASS = 'mgcp-button-secondary';
 const DISABLED_BUTTON_CLASS = 'mgcp-button-disabled';
 const BULK_CONTAINER_ID = 'mgcp-bulk-calendar-actions';
+const INDIVIDUAL_CONTAINER_ID = 'mgcp-individual-calendar-actions';
 const INDIVIDUAL_MARK = 'data-mgcp-enhanced';
 
 const log = (...args: unknown[]): void => {
@@ -209,6 +210,20 @@ const parseManabaDate = (value: string): Date | null => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
+const parseManabaDates = (value: string): Date[] => {
+  const matches = normalizeSpace(value).match(/\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/g) ?? [];
+  const dates: Date[] = [];
+
+  matches.forEach((dateText) => {
+    const date = parseManabaDate(dateText);
+    if (date) {
+      dates.push(date);
+    }
+  });
+
+  return dates;
+};
+
 const formatGoogleDate = (date: Date): string => {
   const pad = (value: number): string => value < 10 ? `0${value}` : String(value);
   return [
@@ -228,6 +243,15 @@ const getAssignmentIdFromUrl = (url: string): string => {
     return parsed.pathname.replace(/^\/ct\//, '').replace(/[^a-zA-Z0-9_-]/g, '_');
   } catch {
     return url.replace(/[^a-zA-Z0-9_-]/g, '_');
+  }
+};
+
+const getCourseIdFromUrl = (url: string): string => {
+  try {
+    const parsed = new URL(url, window.location.href);
+    return parsed.pathname.match(/course_(\d+)/)?.[1] ?? '';
+  } catch {
+    return '';
   }
 };
 
@@ -300,7 +324,7 @@ const getInputValue = (form: HTMLFormElement, name: string): string => {
   return input?.value ?? '';
 };
 
-const enhanceExistingCalendarForms = async (): Promise<void> => {
+const enhanceExistingCalendarForms = async (): Promise<number> => {
   const forms = Array.from(document.querySelectorAll<HTMLFormElement>('form')).filter((form) => {
     return form.method.toUpperCase() === 'GET'
       && /google\.[^/]+\/calendar\/event|calendar\.google\.com\/calendar\/render/.test(form.action)
@@ -308,7 +332,7 @@ const enhanceExistingCalendarForms = async (): Promise<void> => {
   });
 
   if (forms.length === 0) {
-    return;
+    return 0;
   }
 
   const addedIds = new Set(await getAddedIds());
@@ -347,6 +371,186 @@ const enhanceExistingCalendarForms = async (): Promise<void> => {
     wrapper.append(button, status);
     form.appendChild(wrapper);
   });
+
+  return forms.length;
+};
+
+const getAssignmentTypeFromPath = (path: string): string => {
+  if (/_query_\d+/.test(path)) {
+    return '小テスト';
+  }
+  if (/_report_\d+/.test(path)) {
+    return 'レポート';
+  }
+  if (/_survey_\d+/.test(path)) {
+    return 'アンケート';
+  }
+  if (/_drill_\d+/.test(path)) {
+    return 'ドリル';
+  }
+  if (/_project_\d+/.test(path)) {
+    return 'プロジェクト';
+  }
+  return '課題';
+};
+
+const isIndividualAssignmentPage = (): boolean => {
+  return /\/ct\/course_\d+_(query|report|survey|drill|project|exam)_\d+/.test(window.location.pathname);
+};
+
+const getIndividualAssignmentTitle = (): string => {
+  const selectors = [
+    '.myassignments-title',
+    '.query-title',
+    '.report-title',
+    '.survey-title',
+    '.drill-title',
+    '.pagetitle',
+    '.page-title',
+    'main h1',
+    '.contentbody h1',
+    '.contentbody-l h1',
+    'h1',
+  ];
+
+  for (const selector of selectors) {
+    const element = document.querySelector<HTMLElement>(selector);
+    const text = normalizeSpace(element?.textContent ?? '');
+    if (text && !/^(manaba|コースニュース|未提出の課題一覧)$/i.test(text)) {
+      return text;
+    }
+  }
+
+  return normalizeSpace(document.title.replace(/^manaba\s*-\s*/i, '')) || 'manaba課題';
+};
+
+const getIndividualCourseName = (): string => {
+  const courseId = getCourseIdFromUrl(window.location.href);
+  if (!courseId) {
+    return '';
+  }
+
+  const courseLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>(`a[href*="/ct/course_${courseId}"]`));
+  const exactCourseLink = courseLinks.find((link) => {
+    try {
+      return new URL(link.href, window.location.href).pathname === `/ct/course_${courseId}`;
+    } catch {
+      return false;
+    }
+  });
+
+  const courseName = normalizeSpace(exactCourseLink?.textContent ?? '');
+  if (courseName && !/^course_\d+$/.test(courseName)) {
+    return courseName;
+  }
+
+  return '';
+};
+
+const getDeadlineFromLabelledText = (text: string): { deadline: Date; deadlineText: string } | null => {
+  if (!/(受付終了|提出期限|締切|期限)/.test(text)) {
+    return null;
+  }
+
+  const dates = parseManabaDates(text);
+  if (dates.length === 0) {
+    return null;
+  }
+
+  const deadline = dates[dates.length - 1];
+  return {
+    deadline,
+    deadlineText: formatVisibleDeadline(deadline),
+  };
+};
+
+const formatVisibleDeadline = (date: Date): string => {
+  const pad = (value: number): string => value < 10 ? `0${value}` : String(value);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const getIndividualDeadline = (): { deadline: Date; deadlineText: string } | null => {
+  const rows = Array.from(document.querySelectorAll<HTMLTableRowElement>('tr'));
+  for (const row of rows) {
+    const parsed = getDeadlineFromLabelledText(row.textContent ?? '');
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  const definitionItems = Array.from(document.querySelectorAll<HTMLElement>('dl, .row, .formrow, .item, .section, p, div'));
+  for (const item of definitionItems) {
+    const text = normalizeSpace(item.textContent ?? '');
+    if (text.length > 300) {
+      continue;
+    }
+
+    const parsed = getDeadlineFromLabelledText(text);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return null;
+};
+
+const parseIndividualAssignment = (): Assignment | null => {
+  if (!isIndividualAssignmentPage()) {
+    return null;
+  }
+
+  const deadline = getIndividualDeadline();
+  if (!deadline) {
+    return null;
+  }
+
+  const url = window.location.href;
+  return {
+    id: getAssignmentIdFromUrl(url),
+    title: getIndividualAssignmentTitle(),
+    course: getIndividualCourseName(),
+    type: getAssignmentTypeFromPath(window.location.pathname),
+    url,
+    deadline: deadline.deadline,
+    deadlineText: deadline.deadlineText,
+  };
+};
+
+const insertIndividualButton = async (settings: Settings): Promise<void> => {
+  if (document.getElementById(INDIVIDUAL_CONTAINER_ID)) {
+    return;
+  }
+
+  const assignment = parseIndividualAssignment();
+  if (!assignment) {
+    return;
+  }
+
+  const container = document.createElement('div');
+  container.id = INDIVIDUAL_CONTAINER_ID;
+  container.className = 'mgcp-inline-actions';
+
+  const addedIds = new Set(await getAddedIds());
+  const button = createButton('Googleカレンダーに追加', async () => {
+    await openCalendarTabs([createCalendarUrl(assignment, settings)]);
+    await markAdded([assignment.id]);
+    setButtonDone(button);
+  });
+
+  if (addedIds.has(assignment.id)) {
+    setButtonDone(button);
+  }
+
+  const status = document.createElement('span');
+  status.className = 'mgcp-status';
+  status.textContent = `締切: ${assignment.deadlineText}`;
+
+  container.append(button, status);
+
+  const anchor = document.querySelector('.contentbody h1, .contentbody-l h1, main h1, h1')
+    ?? document.querySelector('.contentbody, .contentbody-l, main')
+    ?? document.body;
+  anchor.insertAdjacentElement(anchor.tagName === 'H1' ? 'afterend' : 'afterbegin', container);
 };
 
 const parseHomeAssignments = (): Assignment[] => {
@@ -439,7 +643,10 @@ const enhancePage = async (): Promise<void> => {
   }
 
   injectStyles();
-  await enhanceExistingCalendarForms();
+  const enhancedFormCount = await enhanceExistingCalendarForms();
+  if (enhancedFormCount === 0) {
+    await insertIndividualButton(settings);
+  }
   await insertBulkButton(settings);
 };
 
