@@ -15,12 +15,12 @@
     "storage"
   ],
   "host_permissions": [
-    "https://manaba.*/*"
+    "https://manaba.tsukuba.ac.jp/*"
   ],
   "content_scripts": [
     {
       "matches": [
-        "https://manaba.*/*"
+        "https://manaba.tsukuba.ac.jp/*"
       ],
       "js": [
         "content.js"
