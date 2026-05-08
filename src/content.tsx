@@ -8,13 +8,26 @@ type Assignment = {
   deadlineText: string;
 };
 
-const STORAGE_KEY = 'manabaGCalendarPlus.addedAssignmentIds';
+type Settings = {
+  eventDurationMinutes: number;
+  reminderMinutes: number;
+  timezone: string;
+  manabaHost: string;
+};
+
+const ADDED_IDS_STORAGE_KEY = 'manabaGCalendarPlus.addedAssignmentIds';
+const SETTINGS_STORAGE_KEY = 'manabaGCalendarPlus.settings';
+const DEFAULT_SETTINGS: Settings = {
+  eventDurationMinutes: 30,
+  reminderMinutes: 10,
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  manabaHost: '',
+};
 const BUTTON_CLASS = 'mgcp-button';
 const SECONDARY_BUTTON_CLASS = 'mgcp-button-secondary';
 const DISABLED_BUTTON_CLASS = 'mgcp-button-disabled';
 const BULK_CONTAINER_ID = 'mgcp-bulk-calendar-actions';
 const INDIVIDUAL_MARK = 'data-mgcp-enhanced';
-const JST_TIMEZONE = 'Asia/Tokyo';
 
 const log = (...args: unknown[]): void => {
   console.log('[manaba Google Calendar Plus]', ...args);
@@ -46,12 +59,45 @@ const setStorage = async <T,>(key: string, value: T): Promise<void> => {
   });
 };
 
-const getAddedIds = async (): Promise<string[]> => getStorage<string[]>(STORAGE_KEY, []);
+const sanitizeSettings = (settings: Partial<Settings>): Settings => {
+  const eventDurationMinutes = Number(settings.eventDurationMinutes);
+  const reminderMinutes = Number(settings.reminderMinutes);
+
+  return {
+    eventDurationMinutes: Number.isFinite(eventDurationMinutes) && eventDurationMinutes > 0
+      ? Math.min(Math.round(eventDurationMinutes), 24 * 60)
+      : DEFAULT_SETTINGS.eventDurationMinutes,
+    reminderMinutes: Number.isFinite(reminderMinutes) && reminderMinutes >= 0
+      ? Math.min(Math.round(reminderMinutes), 24 * 60)
+      : DEFAULT_SETTINGS.reminderMinutes,
+    timezone: settings.timezone?.trim() || DEFAULT_SETTINGS.timezone,
+    manabaHost: settings.manabaHost?.trim().toLowerCase() || DEFAULT_SETTINGS.manabaHost,
+  };
+};
+
+const getSettings = async (): Promise<Settings> => {
+  const settings = await getStorage<Partial<Settings>>(SETTINGS_STORAGE_KEY, DEFAULT_SETTINGS);
+  return sanitizeSettings(settings);
+};
+
+const isEnabledForCurrentSite = (settings: Settings): boolean => {
+  if (!window.location.pathname.startsWith('/ct/')) {
+    return false;
+  }
+
+  if (settings.manabaHost) {
+    return window.location.hostname === settings.manabaHost;
+  }
+
+  return window.location.hostname.toLowerCase().startsWith('manaba.');
+};
+
+const getAddedIds = async (): Promise<string[]> => getStorage<string[]>(ADDED_IDS_STORAGE_KEY, []);
 
 const markAdded = async (ids: string[]): Promise<void> => {
   const current = new Set(await getAddedIds());
   ids.forEach((id) => current.add(id));
-  await setStorage(STORAGE_KEY, Array.from(current));
+  await setStorage(ADDED_IDS_STORAGE_KEY, Array.from(current));
 };
 
 const injectStyles = (): void => {
@@ -191,15 +237,17 @@ const getAssignmentIdFromUrl = (url: string): string => {
   }
 };
 
-const createCalendarUrl = (assignment: Assignment): string => {
+const createCalendarUrl = (assignment: Assignment, settings: Settings): string => {
   const start = assignment.deadline;
-  const end = new Date(assignment.deadline.getTime() + 30 * 60 * 1000);
+  const end = new Date(assignment.deadline.getTime() + settings.eventDurationMinutes * 60 * 1000);
   const title = `[manaba締切] ${assignment.title}`;
   const details = [
     `コース: ${assignment.course}`,
     `種別: ${assignment.type}`,
     `提出締切: ${assignment.deadlineText}`,
-    '10分前に通知を設定することをおすすめします。',
+    settings.reminderMinutes > 0
+      ? `${settings.reminderMinutes}分前に通知を設定することをおすすめします。`
+      : '',
     assignment.url,
   ].filter(Boolean).join('\n');
 
@@ -207,7 +255,7 @@ const createCalendarUrl = (assignment: Assignment): string => {
   url.searchParams.set('action', 'TEMPLATE');
   url.searchParams.set('text', title);
   url.searchParams.set('dates', `${formatGoogleDate(start)}/${formatGoogleDate(end)}`);
-  url.searchParams.set('ctz', JST_TIMEZONE);
+  url.searchParams.set('ctz', settings.timezone);
   url.searchParams.set('details', details);
   url.searchParams.set('location', 'manaba');
   return url.toString();
@@ -322,7 +370,7 @@ const parseHomeAssignments = (): Assignment[] => {
   return assignments;
 };
 
-const insertBulkButton = async (): Promise<void> => {
+const insertBulkButton = async (settings: Settings): Promise<void> => {
   if (!/\/ct\/home_library_query/.test(window.location.pathname) || document.getElementById(BULK_CONTAINER_ID)) {
     return;
   }
@@ -349,7 +397,7 @@ const insertBulkButton = async (): Promise<void> => {
     }
 
     button.disabled = true;
-    pending.forEach((assignment) => openCalendarUrl(createCalendarUrl(assignment)));
+    pending.forEach((assignment) => openCalendarUrl(createCalendarUrl(assignment, settings)));
     await markAdded(pending.map((assignment) => assignment.id));
     setButtonDone(button, '登録画面を開きました');
     status.textContent = `${pending.length} 件のGoogleカレンダー登録画面を開きました`;
@@ -362,9 +410,9 @@ const insertBulkButton = async (): Promise<void> => {
   const resetButton = createButton('追加済みをリセット', async () => {
     const current = new Set(await getAddedIds());
     assignments.forEach((assignment) => current.delete(assignment.id));
-    await setStorage(STORAGE_KEY, Array.from(current));
+    await setStorage(ADDED_IDS_STORAGE_KEY, Array.from(current));
     container.remove();
-    await insertBulkButton();
+    await insertBulkButton(settings);
   }, true);
 
   container.append(button, resetButton, status);
@@ -372,9 +420,14 @@ const insertBulkButton = async (): Promise<void> => {
 };
 
 const enhancePage = async (): Promise<void> => {
+  const settings = await getSettings();
+  if (!isEnabledForCurrentSite(settings)) {
+    return;
+  }
+
   injectStyles();
   await enhanceExistingCalendarForms();
-  await insertBulkButton();
+  await insertBulkButton(settings);
 };
 
 const scheduleEnhance = (() => {

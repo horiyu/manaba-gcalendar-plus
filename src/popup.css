@@ -1,15 +1,101 @@
 body {
+  background: #f8fafc;
+  color: #172033;
   margin: 0;
-  width: 300px;
-  height: 200px;
+  width: 340px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.popup {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
 }
 
 h1 {
-  font-size: 1em;
+  font-size: 16px;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field span {
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+input {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-sizing: border-box;
+  color: #172033;
+  min-height: 34px;
+  padding: 7px 9px;
+  width: 100%;
+}
+
+input:focus {
+  border-color: #1a73e8;
+  outline: 3px solid rgba(26, 115, 232, .18);
+}
+
+.note,
+.saved {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.note {
+  color: #64748b;
+}
+
+.saved {
+  color: #166534;
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 button {
-  padding: 8px 12px;
-  font-size: 14px;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #174ea6;
   cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 7px 12px;
+}
+
+button:hover {
+  background: #f3f7ff;
+}
+
+button.primary {
+  background: #1a73e8;
+  border-color: #1558b0;
+  color: #fff;
+}
+
+button.primary:hover {
+  background: #185abc;
 }

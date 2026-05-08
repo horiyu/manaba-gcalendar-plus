@@ -11,16 +11,14 @@
       "128": "icons/icon128.png"
     }
   },
+  "options_page": "popup.html",
   "permissions": [
     "storage"
-  ],
-  "host_permissions": [
-    "https://manaba.tsukuba.ac.jp/*"
   ],
   "content_scripts": [
     {
       "matches": [
-        "https://manaba.tsukuba.ac.jp/*"
+        "https://*/ct/*"
       ],
       "js": [
         "content.js"
