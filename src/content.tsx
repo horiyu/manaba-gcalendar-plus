@@ -2,7 +2,6 @@ type Assignment = {
   id: string;
   title: string;
   course: string;
-  courseCode: string;
   type: string;
   url: string;
   deadline: Date;
@@ -232,19 +231,8 @@ const getAssignmentIdFromUrl = (url: string): string => {
   }
 };
 
-const getCourseCodeFromUrl = (url: string): string => {
-  try {
-    const parsed = new URL(url, window.location.href);
-    const match = parsed.pathname.match(/course_(\d+)/);
-    return match?.[1] ?? '';
-  } catch {
-    return '';
-  }
-};
-
 const createCalendarTitle = (assignment: Assignment): string => {
-  const courseLabel = [assignment.courseCode, assignment.course].filter(Boolean).join(' ');
-  return courseLabel ? `[${courseLabel}] ${assignment.title}` : assignment.title;
+  return assignment.course ? `[${assignment.course}] ${assignment.title}` : assignment.title;
 };
 
 const createCalendarUrl = (assignment: Assignment, settings: Settings): string => {
@@ -381,12 +369,10 @@ const parseHomeAssignments = (): Assignment[] => {
     }
 
     const url = new URL(titleLink.href, window.location.href).toString();
-    const courseUrl = courseLink ? new URL(courseLink.href, window.location.href).toString() : url;
     assignments.push({
       id: getAssignmentIdFromUrl(url),
       title: normalizeSpace(titleLink.textContent ?? ''),
       course: normalizeSpace(courseLink?.textContent ?? ''),
-      courseCode: getCourseCodeFromUrl(courseUrl),
       type: normalizeSpace(cells[0]?.textContent ?? ''),
       url,
       deadline,
