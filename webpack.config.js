@@ -3,7 +3,8 @@ const CopyPlugin = require('copy-webpack-plugin');
 
 module.exports = {
   entry: {
-    popup: path.resolve(__dirname, 'src', 'popup.tsx')
+    popup: path.resolve(__dirname, 'src', 'popup.tsx'),
+    content: path.resolve(__dirname, 'src', 'content.tsx')
   },
   output: {
     filename: '[name].js',

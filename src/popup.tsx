@@ -20,10 +20,10 @@ const App: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: '16px', fontFamily: 'sans-serif' }}>
-      <h1>Sample Extension</h1>
-      <p>Count: {count}</p>
-      <button onClick={handleClick}>Increment</button>
+    <div style={{ padding: '5px', fontFamily: 'sans-serif' }}>
+      <h1>manaba Googleカレンダー＋</h1>
+      {/* <p>Count: {count}</p>
+      <button onClick={handleClick}>Increment</button> */}
     </div>
   );
 };

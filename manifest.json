@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Sample React TSX Extension",
+  "name": "manaba Google Calendar Plus",
   "version": "1.0",
-  "description": "A simple Chrome extension with React and TSX popup",
+  "description": "manabaのGoogle Calendar連携機能を強化する拡張機能",
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -13,5 +13,19 @@
   },
   "permissions": [
     "storage"
+  ],
+  "host_permissions": [
+    "https://manaba.*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://manaba.*/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
   ]
 }
