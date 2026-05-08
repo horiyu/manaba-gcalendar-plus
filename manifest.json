@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "manaba Google Calendar Plus",
-  "version": "1.0",
+  "version": "1.1",
   "description": "manabaのGoogle Calendar連携機能を強化する拡張機能",
   "action": {
     "default_popup": "popup.html",
