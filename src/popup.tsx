@@ -4,7 +4,6 @@ import './popup.css';
 
 type Settings = {
   eventDurationMinutes: number;
-  reminderMinutes: number;
   timezone: string;
   manabaHost: string;
 };
@@ -12,22 +11,17 @@ type Settings = {
 const SETTINGS_STORAGE_KEY = 'manabaGCalendarPlus.settings';
 const DEFAULT_SETTINGS: Settings = {
   eventDurationMinutes: 60,
-  reminderMinutes: 10,
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   manabaHost: '',
 };
 
 const sanitizeSettings = (settings: Partial<Settings>): Settings => {
   const eventDurationMinutes = Number(settings.eventDurationMinutes);
-  const reminderMinutes = Number(settings.reminderMinutes);
 
   return {
     eventDurationMinutes: Number.isFinite(eventDurationMinutes) && eventDurationMinutes > 0
       ? Math.min(Math.round(eventDurationMinutes), 24 * 60)
       : DEFAULT_SETTINGS.eventDurationMinutes,
-    reminderMinutes: Number.isFinite(reminderMinutes) && reminderMinutes >= 0
-      ? Math.min(Math.round(reminderMinutes), 24 * 60)
-      : DEFAULT_SETTINGS.reminderMinutes,
     timezone: settings.timezone?.trim() || DEFAULT_SETTINGS.timezone,
     manabaHost: settings.manabaHost?.trim().toLowerCase() || DEFAULT_SETTINGS.manabaHost,
   };
@@ -97,17 +91,6 @@ const App: React.FC = () => {
           max="1440"
           value={settings.eventDurationMinutes}
           onChange={(event) => updateField('eventDurationMinutes', event.target.value)}
-        />
-      </label>
-
-      <label className="field">
-        <span>通知推奨（分前）</span>
-        <input
-          type="number"
-          min="0"
-          max="1440"
-          value={settings.reminderMinutes}
-          onChange={(event) => updateField('reminderMinutes', event.target.value)}
         />
       </label>
 

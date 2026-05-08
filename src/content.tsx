@@ -2,6 +2,7 @@ type Assignment = {
   id: string;
   title: string;
   course: string;
+  courseCode: string;
   type: string;
   url: string;
   deadline: Date;
@@ -10,7 +11,6 @@ type Assignment = {
 
 type Settings = {
   eventDurationMinutes: number;
-  reminderMinutes: number;
   timezone: string;
   manabaHost: string;
 };
@@ -19,7 +19,6 @@ const ADDED_IDS_STORAGE_KEY = 'manabaGCalendarPlus.addedAssignmentIds';
 const SETTINGS_STORAGE_KEY = 'manabaGCalendarPlus.settings';
 const DEFAULT_SETTINGS: Settings = {
   eventDurationMinutes: 60,
-  reminderMinutes: 10,
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   manabaHost: '',
 };
@@ -61,15 +60,11 @@ const setStorage = async <T,>(key: string, value: T): Promise<void> => {
 
 const sanitizeSettings = (settings: Partial<Settings>): Settings => {
   const eventDurationMinutes = Number(settings.eventDurationMinutes);
-  const reminderMinutes = Number(settings.reminderMinutes);
 
   return {
     eventDurationMinutes: Number.isFinite(eventDurationMinutes) && eventDurationMinutes > 0
       ? Math.min(Math.round(eventDurationMinutes), 24 * 60)
       : DEFAULT_SETTINGS.eventDurationMinutes,
-    reminderMinutes: Number.isFinite(reminderMinutes) && reminderMinutes >= 0
-      ? Math.min(Math.round(reminderMinutes), 24 * 60)
-      : DEFAULT_SETTINGS.reminderMinutes,
     timezone: settings.timezone?.trim() || DEFAULT_SETTINGS.timezone,
     manabaHost: settings.manabaHost?.trim().toLowerCase() || DEFAULT_SETTINGS.manabaHost,
   };
@@ -237,17 +232,29 @@ const getAssignmentIdFromUrl = (url: string): string => {
   }
 };
 
+const getCourseCodeFromUrl = (url: string): string => {
+  try {
+    const parsed = new URL(url, window.location.href);
+    const match = parsed.pathname.match(/course_(\d+)/);
+    return match?.[1] ?? '';
+  } catch {
+    return '';
+  }
+};
+
+const createCalendarTitle = (assignment: Assignment): string => {
+  const courseLabel = [assignment.courseCode, assignment.course].filter(Boolean).join(' ');
+  return courseLabel ? `[${courseLabel}] ${assignment.title}` : assignment.title;
+};
+
 const createCalendarUrl = (assignment: Assignment, settings: Settings): string => {
   const start = new Date(assignment.deadline.getTime() - settings.eventDurationMinutes * 60 * 1000);
   const end = assignment.deadline;
-  const title = `[manaba締切] ${assignment.title}`;
+  const title = createCalendarTitle(assignment);
   const details = [
     `コース: ${assignment.course}`,
     `種別: ${assignment.type}`,
     `提出締切: ${assignment.deadlineText}`,
-    settings.reminderMinutes > 0
-      ? `${settings.reminderMinutes}分前に通知を設定することをおすすめします。`
-      : '',
     assignment.url,
   ].filter(Boolean).join('\n');
 
@@ -374,10 +381,12 @@ const parseHomeAssignments = (): Assignment[] => {
     }
 
     const url = new URL(titleLink.href, window.location.href).toString();
+    const courseUrl = courseLink ? new URL(courseLink.href, window.location.href).toString() : url;
     assignments.push({
       id: getAssignmentIdFromUrl(url),
       title: normalizeSpace(titleLink.textContent ?? ''),
       course: normalizeSpace(courseLink?.textContent ?? ''),
+      courseCode: getCourseCodeFromUrl(courseUrl),
       type: normalizeSpace(cells[0]?.textContent ?? ''),
       url,
       deadline,
