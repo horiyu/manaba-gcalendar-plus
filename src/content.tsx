@@ -18,7 +18,7 @@ type Settings = {
 const ADDED_IDS_STORAGE_KEY = 'manabaGCalendarPlus.addedAssignmentIds';
 const SETTINGS_STORAGE_KEY = 'manabaGCalendarPlus.settings';
 const DEFAULT_SETTINGS: Settings = {
-  eventDurationMinutes: 30,
+  eventDurationMinutes: 60,
   reminderMinutes: 10,
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   manabaHost: '',
@@ -238,8 +238,8 @@ const getAssignmentIdFromUrl = (url: string): string => {
 };
 
 const createCalendarUrl = (assignment: Assignment, settings: Settings): string => {
-  const start = assignment.deadline;
-  const end = new Date(assignment.deadline.getTime() + settings.eventDurationMinutes * 60 * 1000);
+  const start = new Date(assignment.deadline.getTime() - settings.eventDurationMinutes * 60 * 1000);
+  const end = assignment.deadline;
   const title = `[manaba締切] ${assignment.title}`;
   const details = [
     `コース: ${assignment.course}`,

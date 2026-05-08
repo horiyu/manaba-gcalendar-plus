@@ -11,7 +11,7 @@ type Settings = {
 
 const SETTINGS_STORAGE_KEY = 'manabaGCalendarPlus.settings';
 const DEFAULT_SETTINGS: Settings = {
-  eventDurationMinutes: 30,
+  eventDurationMinutes: 60,
   reminderMinutes: 10,
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   manabaHost: '',
@@ -90,7 +90,7 @@ const App: React.FC = () => {
       </label>
 
       <label className="field">
-        <span>予定の長さ（分）</span>
+        <span>締切前の予定時間（分）</span>
         <input
           type="number"
           min="1"
